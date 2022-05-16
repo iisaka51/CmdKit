@@ -154,10 +154,7 @@ class Namespace(NSCoreMixin):
            Generic factory method delegates based on filename extension.
         """
 
-        if ftype in ('toml', 'tml', 'yaml', 'yml', 'json'):
-            ext = ftype
-        else:
-            ext = os.path.splitext(filepath)[1].lstrip('.')
+        ext = ftype or os.path.splitext(filepath)[1].lstrip('.')
         if not os.path.exists(filepath) and ignore_if_missing is True:
             return cls()
         try:
@@ -203,10 +200,7 @@ class Namespace(NSCoreMixin):
     def to_local(self, filepath: str, ftype: Optional[str] = None,  **options) -> None:
         """Output to local file.
            if ftype not set, Format based on file extension."""
-        if ftype in ('toml', 'tml', 'yaml', 'yml', 'json'):
-            ext = ftype
-        else:
-            ext = os.path.splitext(filepath)[1].lstrip('.')
+        ext = ftype or os.path.splitext(filepath)[1].lstrip('.')
         try:
             factory = getattr(self, f'to_{ext}')
             return factory(filepath, **options)
@@ -536,6 +530,7 @@ class Configuration(NSCoreMixin):
 
     @classmethod
     def from_local(cls, *, env: bool = False, prefix: str = None,
+                   ftype: Optional[str] = None,
                    default: dict = None, **files: str) -> Configuration:
         """
         Create configuration from a cascade of `files`. Optionally include `env`.
@@ -552,7 +547,7 @@ class Configuration(NSCoreMixin):
         default_ = Namespace() if not default else Namespace(default)
         cfg = cls(default=default_)
         for label, filepath in files.items():
-            cfg.extend(**{label: Namespace.from_local(filepath, ignore_if_missing=True)})
+            cfg.extend(**{label: Namespace.from_local(filepath, ignore_if_missing=True, ftype=ftype)})
         if env:
             cfg.extend(env=Environ(prefix).reduce())
         return cfg
