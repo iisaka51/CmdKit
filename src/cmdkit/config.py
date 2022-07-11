@@ -133,12 +133,15 @@ class Namespace(NSCoreMixin):
         >>> ns
         Namespace({'a': {'x': 4, 'y': 2, 'z': 5}, 'b': 3})
 
+<<<<<<< HEAD:cmdkit/config.py
         >>> Namespace.from_local('config.toml', ignore_if_missing=True)
         Namespace({})
 
         >>> Namespace.from_local('config', ftype='toml', ignore_if_missing=True)
         Namespace({})
 
+=======
+>>>>>>> upstream/develop:src/cmdkit/config.py
         >>> ns.to_local('config.toml')
         >>> Namespace.from_local('config.toml', ignore_if_missing=True)
         Namespace({'a': {'x': 4, 'y': 2, 'z': 5}, 'b': 3})
@@ -150,12 +153,43 @@ class Namespace(NSCoreMixin):
         return cls(other)
 
     @classmethod
+<<<<<<< HEAD:cmdkit/config.py
     def from_local(cls, filepath: str, ignore_if_missing: bool = False, ftype: Optional[str] = None,  **options) -> Namespace:
         """if ftype not set,
            Generic factory method delegates based on filename extension.
         """
 
         ext = ftype or os.path.splitext(filepath)[1].lstrip('.')
+=======
+    def from_local(cls, filepath: str, ignore_if_missing: bool = False,
+                   ftype: Optional[str] = None,  **options) -> Namespace:
+        """
+        Load from a local file.
+
+        If `filepath` does not exist an exception is raised as expected,
+        unless `ignore_if_missing` is `True` and an empty Namespace is returned instead.
+
+        Supported formats are `yaml`, `toml`, and `json`. You must have the necessary
+        library installed (i.e., `pyyaml` or `toml` respectively).
+
+        Example:
+            >>> Namespace.from_local('config.toml', ignore_if_missing=True)
+            Namespace({})
+
+            >>> Namespace({'a': {'x': 1, 'y': 2}, 'b': 3}).to_local('config.toml')
+            >>> Namespace.from_local('config.toml')
+            Namespace({'a': {'x': 1, 'y': 2}, 'b': 3})
+
+            For a non-standard filename extension use `ftype`.
+
+            >>> Namespace.from_local('config', ftype='toml', ignore_if_missing=True)
+            Namespace({})
+        """
+        if ftype in ('toml', 'tml', 'yaml', 'yml', 'json'):
+            ext = ftype
+        else:
+            ext = os.path.splitext(filepath)[1].lstrip('.')
+>>>>>>> upstream/develop:src/cmdkit/config.py
         if not os.path.exists(filepath) and ignore_if_missing is True:
             return cls()
         try:
@@ -199,9 +233,17 @@ class Namespace(NSCoreMixin):
         return _as_dict(self)
 
     def to_local(self, filepath: str, ftype: Optional[str] = None,  **options) -> None:
+<<<<<<< HEAD:cmdkit/config.py
         """Output to local file.
            if ftype not set, Format based on file extension."""
         ext = ftype or os.path.splitext(filepath)[1].lstrip('.')
+=======
+        """Output to local file. If `ftype` not set, format based on file extension."""
+        if ftype in ('toml', 'tml', 'yaml', 'yml', 'json'):
+            ext = ftype
+        else:
+            ext = os.path.splitext(filepath)[1].lstrip('.')
+>>>>>>> upstream/develop:src/cmdkit/config.py
         try:
             factory = getattr(self, f'to_{ext}')
             return factory(filepath, **options)
@@ -235,7 +277,7 @@ class Namespace(NSCoreMixin):
         else:
             json.dump(self.to_dict(), path_or_file, indent=indent, **kwargs)
 
-    # short-hand
+    # aliases
     from_yml = from_yaml
     from_tml = from_toml
     to_yml = to_yaml
@@ -340,8 +382,8 @@ def _de_coerced(var: _VT) -> str:
         return str(var)
 
 
-# helper function recursively normalizes a dictionary to depth-1.
 def _flatten(ns: dict, prefix: str = None) -> dict:
+    """Helper function recursively normalizes a dictionary to depth-1."""
     new = {}
     for key, value in dict(ns).items():
         if not isinstance(value, dict):
@@ -425,7 +467,7 @@ class Environ(NSCoreMixin):
         The `converter` should be a function that accepts an input value
         and returns a new value appropriately coerced. The default converter
         attempts first to coerce a value to an integer if possible, then
-        a float, with the exception of the following special values.
+        a float, except the following special values.
         Otherwise, the string remains.
 
         ======================== ========================
@@ -589,7 +631,7 @@ class Configuration(NSCoreMixin):
         Note:
             Care needs to be taken when used for mutable variables in the
             stack as the returned precedent does not reflect that the variable
-            at that level my be a depth-first-merge of several sources.
+            at that level may be a depth-first-merge of several sources.
 
             >>> conf = Configuration(one=Namespace({'a': {'x': 1, 'y': 2}}),
             ...                      two=Namespace({'a': {'y': 3}}))
@@ -624,7 +666,8 @@ class Configuration(NSCoreMixin):
             >>> cfg.duplicates()
             {'x': {'one': [('a',), ('b',)], 'two': [('b',)]}, 'z': {'one': [('b',)], 'two': [('b',)]}}
         """
-        tips = [tip for _, (*_, tip) in _find_the_leaves(self.namespaces)]
+        namespaces = Namespace({**self.namespaces, '_': self.local})
+        tips = [tip for _, (*_, tip) in _find_the_leaves(namespaces)]
         return {tip: self.whereis(tip) for tip, count in Counter(tips).items() if count > 1}  
 
     def whereis(self, leaf: str,
@@ -646,7 +689,8 @@ class Configuration(NSCoreMixin):
             >>> cfg.whereis('x', lambda v: v % 3 == 0)
             {'one': [('b',)], 'two': []}
         """
-        return {name: space.whereis(leaf, value) for name, space in self.namespaces.items()}
+        namespaces = Namespace({**self.namespaces, '_': self.local})
+        return {name: space.whereis(leaf, value) for name, space in namespaces.items()}
 
     def __setattr__(self, name: str, value: Any) -> None:
         """Intercept parameter assignment."""
@@ -664,7 +708,7 @@ class Configuration(NSCoreMixin):
             Doing any in-place changes to its underlying `self` does not change its member namespaces.
             This may otherwise cause confusion about the provenance of those parameters.
             Instead, overrides have been implemented to capture these changes in a `local` namespace.
-            If you ask :func:`which` namespace a parameter has come from and it was an in-place change,
+            If you ask :func:`which` namespace a parameter has come from, and it was an in-place change,
             it will be considered a member of the "_" namespace.
 
         Example:
@@ -690,18 +734,16 @@ class Configuration(NSCoreMixin):
         self.local.update(*args, **kwargs)
         super().update(*args, **kwargs)
 
-    @classmethod
-    def pop(cls, *args, **kwargs):
+    def pop(self, *args, **kwargs) -> Any:
         """
         It is not straight forward to implement the equivalent of super().update() for
         the general case; currently disallow pop() on `Configuration`.
         """
-        raise NotImplementedError(f'{cls.__class__.__name__} does not currently support pop()')
-    
-    @classmethod
-    def popitem(cls):
+        raise NotImplementedError(f'{self.__class__.__name__} does not currently support pop()')
+
+    def popitem(self) -> Tuple[str, Any]:
         """
         It is not straight forward to implement the equivalent of super().update() for
         the general case; currently disallow popitem() on `Configuration`.
         """
-        raise NotImplementedError(f'{cls.__class__.__name__} does not currently support popitem()')
+        raise NotImplementedError(f'{self.__class__.__name__} does not currently support popitem()')
